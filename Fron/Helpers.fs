@@ -8,13 +8,9 @@ let (|BetweenInclusive|_|) lo hi x =
     else
         None
 
-let tryCreateLimited
-    (fromValue: int)
-    (toValue: int)
-    (ctor: int -> 'a)
-    (onError: int -> ExpressionError)
-    (value: int)
-    : Result<'a, ExpressionError> =
+let tryCreateLimited (fromValue: int) (toValue: int) (ctor: int -> 'a) (value: int) : Result<'a, ExpressionError> =
     match value with
     | BetweenInclusive fromValue toValue -> value |> ctor |> Ok
-    | _ -> Error(onError value)
+    | _ -> Error(ExpressionError $"{value} is beyond permitted range.")
+
+let tryCreateInZeroSixtyRange ctor (value: int) = value |> tryCreateLimited 0 60 ctor

@@ -4,62 +4,105 @@ open Fron.Helpers
 open Fron.CommonTypes
 open Microsoft.FSharp.Core
 
+type Hours =
+    private
+    | Hours of int
+    | EveryHour
+
+type Minutes =
+    private
+    | Minutes of int
+    | EveryMinute
+
+type Seconds =
+    private
+    | Seconds of int
+    | EverySecond
+
 type CronExpression = CronExpression of string
 
-type private CronExpressionParameters =
-    { Seconds: int
-      Minutes: int
-      Hours: int }
+type NewCronExpression = { Value: int }
+type HoursCronExpression = { Hours: Hours }
+type MinutesCronExpression = { Hours: Hours; Minutes: Minutes }
 
-type CronExpressionElement =
-    | Seconds of int
-    | Minutes of int
-    | Hours of int
+type FinalCronExpression =
+    { Hours: Hours
+      Minutes: Minutes
+      Seconds: Seconds }
 
-type BuildExpressionResult = Result<CronExpressionElement list, ExpressionError>
+type BuildExpressionResult<'a> = Result<'a, ExpressionError>
+type HoursExpressionResult = BuildExpressionResult<HoursCronExpression>
+type MinutesExpressionResult = BuildExpressionResult<MinutesCronExpression>
+type FinalExpressionResult = BuildExpressionResult<FinalCronExpression>
 type ExpressionResult = Result<CronExpression, ExpressionError>
 
-type NewCronExpression = NewCronExpression of int * BuildExpressionResult
+let EverySecondCronExpression =
+    { Seconds = EverySecond
+      Minutes = EveryMinute
+      Hours = EveryHour }
 
-let private createRangeError value =
-    ExpressionError $"{value} is beyond permitted range."
+let triggerAt (value: int) : NewCronExpression = { Value = value }
 
-let private createZeroSixtyUnit ctor (NewCronExpression (value, current)) =
+let andAlso (value: int) (current: BuildExpressionResult<'a>) : int * BuildExpressionResult<'a> = value, current
+
+let andAlsoZero (current: BuildExpressionResult<'a>) : int * BuildExpressionResult<'a> = 0, current
+
+let triggerEveryHour: FinalExpressionResult =
+    Ok
+        { EverySecondCronExpression with
+            Seconds = Seconds 0
+            Minutes = Minutes 0 }
+
+let hours ({ Value = value }: NewCronExpression) : HoursExpressionResult =
+    value
+    |> tryCreateLimited 0 24 Hours
+    |> Result.map (fun hrs -> { Hours = hrs })
+
+let triggerEveryMinute: FinalExpressionResult =
+    Ok { EverySecondCronExpression with Seconds = Seconds 0 }
+
+let minutes ((value, current): int * HoursExpressionResult) : MinutesExpressionResult =
     current
-    |> Result.bind (fun list ->
+    |> Result.bind (fun { Hours = hours } ->
         value
-        |> tryCreateLimited 0 60 ctor createRangeError
-        |> Result.map (fun item -> item :: list))
+        |> tryCreateInZeroSixtyRange Minutes
+        |> Result.map (fun minutes -> { Hours = hours; Minutes = minutes }))
 
-let triggerEvery (value: int) : NewCronExpression = NewCronExpression(value, Ok [])
+let triggerEverySecond: FinalExpressionResult =
+    Ok EverySecondCronExpression
 
-let andAlso (value: int) (current: BuildExpressionResult) = NewCronExpression(value, current)
+let seconds ((value, current): int * MinutesExpressionResult) : FinalExpressionResult =
+    current
+    |> Result.bind (fun { Hours = hours; Minutes = minutes } ->
+        value
+        |> tryCreateInZeroSixtyRange Seconds
+        |> Result.map (fun sec ->
+            { Hours = hours
+              Minutes = minutes
+              Seconds = sec }))
 
-let seconds = createZeroSixtyUnit Seconds
+let generate (current: Result<FinalCronExpression, ExpressionError>) : ExpressionResult =
+    let buildExpressionString
+        ({ Seconds = seconds
+           Minutes = minutes
+           Hours = hours }: FinalCronExpression)
+        : string =
+        let hoursInterval =
+            match hours with
+            | Hours value -> $"{value}"
+            | EveryHour -> "*"
 
-let minutes = createZeroSixtyUnit Minutes
+        let minutesInterval =
+            match minutes with
+            | Minutes value -> $"{value}"
+            | EveryMinute -> "*"
 
-let hours = createZeroSixtyUnit Hours
+        let secondsInterval =
+            match seconds with
+            | Seconds value -> $"{value}"
+            | EverySecond -> "*"
 
-let generate (current: BuildExpressionResult) : ExpressionResult =
-    let getParameters (elements: CronExpressionElement list) : CronExpressionParameters =
-        elements
-        |> List.fold
-            (fun acc item ->
-                match item with
-                | Seconds value -> { acc with Seconds = value }
-                | Minutes value -> { acc with Minutes = value }
-                | Hours value -> { acc with Hours = value })
-            { Seconds = 0; Minutes = 0; Hours = 0 }
-
-    let getInterval (value: int) = if value = 0 then "0" else $"0/{value}"
-
-    let buildExpressionString (parameters: CronExpressionParameters) =
-        $"{getInterval parameters.Seconds} {getInterval parameters.Minutes} {getInterval parameters.Hours} 1/1 * ? *"
+        $"{secondsInterval} {minutesInterval} {hoursInterval} ? * *"
 
     current
-    |> Result.map (fun elements ->
-        elements
-        |> getParameters
-        |> buildExpressionString
-        |> CronExpression)
+    |> Result.map (buildExpressionString >> CronExpression)

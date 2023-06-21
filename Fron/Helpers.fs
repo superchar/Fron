@@ -2,15 +2,10 @@
 
 open CommonTypes
 
-let (|BetweenInclusive|_|) lo hi x =
-    if lo <= x && x <= hi then
-        Some()
+let tryCreateLimited (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
+    if value >= 0 && value < toValue then
+        value |> ctor |> Ok
     else
-        None
+        Error(ExpressionError $"{value} is beyond permitted range.")
 
-let tryCreateLimited (fromValue: int) (toValue: int) (ctor: int -> 'a) (value: int) : Result<'a, ExpressionError> =
-    match value with
-    | BetweenInclusive fromValue toValue -> value |> ctor |> Ok
-    | _ -> Error(ExpressionError $"{value} is beyond permitted range.")
-
-let tryCreateInZeroSixtyRange ctor (value: int) = value |> tryCreateLimited 0 60 ctor
+let tryCreateLessThanSixty ctor (value: int) = value |> tryCreateLimited 60 ctor

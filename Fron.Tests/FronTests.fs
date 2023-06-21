@@ -44,7 +44,7 @@ let ``triggerEveryMinute returns the correct Cron expression`` () =
 [<Fact>]
 let ``triggerEverySecond returns the correct Cron expression`` () =
     let result =
-        triggerEveryMinute |> toCronExpression
+        triggerEverySecond |> toCronExpression
 
     result
     |> should be (ofCase <@ ExpressionResult.Ok @>)
@@ -52,7 +52,7 @@ let ``triggerEverySecond returns the correct Cron expression`` () =
     let (CronExpression value) =
         result |> getLeft
 
-    value |> should be (equal "0 * * ? * *")
+    value |> should be (equal "* * * ? * *")
 
 [<Theory>]
 [<InlineData(0)>]
@@ -205,3 +205,25 @@ let ``when hours, minutes and seconds are specified the result expression contai
         result |> getLeft
 
     value |> should be (equal "11 5 13 ? * *")
+
+[<Fact>]
+let ``when hours, minutes and seconds are all invalid returns first error`` () =
+    let hoursValue = 25
+    let minutesValue = 61
+    let secondsValue = 61
+
+    let result =
+        triggerAt hoursValue
+        |> hours
+        |> andAlso minutesValue
+        |> minutes
+        |> andAlso secondsValue
+        |> seconds
+        |> toCronExpression
+
+    result
+    |> should be (ofCase <@ ExpressionResult.Error @>)
+
+    result
+    |> getErrorMessage
+    |> should be (equal $"{hoursValue} is beyond permitted range.")

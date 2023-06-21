@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fron", "Fron\Fron.fsproj", "{D87E40DC-9AA0-438B-BAEB-4BF7FB6CB3E7}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Fron.Tests", "Fron.Tests\Fron.Tests.fsproj", "{C326AF07-BCC3-44EB-A7DD-D7AE9E83E972}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{D87E40DC-9AA0-438B-BAEB-4BF7FB6CB3E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D87E40DC-9AA0-438B-BAEB-4BF7FB6CB3E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D87E40DC-9AA0-438B-BAEB-4BF7FB6CB3E7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C326AF07-BCC3-44EB-A7DD-D7AE9E83E972}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C326AF07-BCC3-44EB-A7DD-D7AE9E83E972}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C326AF07-BCC3-44EB-A7DD-D7AE9E83E972}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C326AF07-BCC3-44EB-A7DD-D7AE9E83E972}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

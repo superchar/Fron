@@ -1,3 +1,3 @@
-﻿module Fron.CommonTypes
+﻿module CommonTypes
 
 type ExpressionError = ExpressionError of string

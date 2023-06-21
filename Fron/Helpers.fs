@@ -1,6 +1,6 @@
-﻿module Fron.Helpers
+﻿module Helpers
 
-open Fron.CommonTypes
+open CommonTypes
 
 let (|BetweenInclusive|_|) lo hi x =
     if lo <= x && x <= hi then

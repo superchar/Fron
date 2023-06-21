@@ -1,7 +1,7 @@
 ﻿module Fron
 
-open Fron.Helpers
-open Fron.CommonTypes
+open Helpers
+open CommonTypes
 open Microsoft.FSharp.Core
 
 type Hours =
@@ -21,57 +21,58 @@ type Seconds =
 
 type CronExpression = CronExpression of string
 
-type NewCronExpression = { Value: int }
-type HoursCronExpression = { Hours: Hours }
-type MinutesCronExpression = { Hours: Hours; Minutes: Minutes }
+type NewExpressionHolder = { Value: int }
+type HoursExpressionHolder = { Hours: Hours }
+type MinutesExpressionHolder = { Hours: Hours; Minutes: Minutes }
 
-type FinalCronExpression =
+type FinalExpressionHolder =
     { Hours: Hours
       Minutes: Minutes
       Seconds: Seconds }
 
-type BuildExpressionResult<'a> = Result<'a, ExpressionError>
-type HoursExpressionResult = BuildExpressionResult<HoursCronExpression>
-type MinutesExpressionResult = BuildExpressionResult<MinutesCronExpression>
-type FinalExpressionResult = BuildExpressionResult<FinalCronExpression>
-type ExpressionResult = Result<CronExpression, ExpressionError>
+type ExpressionErrorResult<'a> = Result<'a, ExpressionError>
+type HoursExpressionHolderResult = ExpressionErrorResult<HoursExpressionHolder>
+type MinutesExpressionHolderResult = ExpressionErrorResult<MinutesExpressionHolder>
+type FinalExpressionHolderResult = ExpressionErrorResult<FinalExpressionHolder>
+type ExpressionResult = ExpressionErrorResult<CronExpression>
 
-let EverySecondCronExpression =
+let EverySecondExpressionHolder =
     { Seconds = EverySecond
       Minutes = EveryMinute
       Hours = EveryHour }
 
-let triggerAt (value: int) : NewCronExpression = { Value = value }
+let triggerAt (value: int) : NewExpressionHolder = { Value = value }
 
-let andAlso (value: int) (current: BuildExpressionResult<'a>) : int * BuildExpressionResult<'a> = value, current
+let andAlso (value: int) (current: ExpressionErrorResult<'a>) : int * ExpressionErrorResult<'a> = value, current
 
-let andAlsoZero (current: BuildExpressionResult<'a>) : int * BuildExpressionResult<'a> = 0, current
+let andAlsoZero (_: ExpressionErrorResult<'a>) : ExpressionErrorResult<'a> -> int * ExpressionErrorResult<'a> =
+    andAlso 0
 
-let triggerEveryHour: FinalExpressionResult =
+let triggerEveryHour: FinalExpressionHolderResult =
     Ok
-        { EverySecondCronExpression with
+        { EverySecondExpressionHolder with
             Seconds = Seconds 0
             Minutes = Minutes 0 }
 
-let hours ({ Value = value }: NewCronExpression) : HoursExpressionResult =
+let hours ({ Value = value }: NewExpressionHolder) : HoursExpressionHolderResult =
     value
     |> tryCreateLimited 0 24 Hours
     |> Result.map (fun hrs -> { Hours = hrs })
 
-let triggerEveryMinute: FinalExpressionResult =
-    Ok { EverySecondCronExpression with Seconds = Seconds 0 }
+let triggerEveryMinute: FinalExpressionHolderResult =
+    Ok { EverySecondExpressionHolder with Seconds = Seconds 0 }
 
-let minutes ((value, current): int * HoursExpressionResult) : MinutesExpressionResult =
+let minutes ((value, current): int * HoursExpressionHolderResult) : MinutesExpressionHolderResult =
     current
     |> Result.bind (fun { Hours = hours } ->
         value
         |> tryCreateInZeroSixtyRange Minutes
         |> Result.map (fun minutes -> { Hours = hours; Minutes = minutes }))
 
-let triggerEverySecond: FinalExpressionResult =
-    Ok EverySecondCronExpression
+let triggerEverySecond: FinalExpressionHolderResult =
+    Ok EverySecondExpressionHolder
 
-let seconds ((value, current): int * MinutesExpressionResult) : FinalExpressionResult =
+let seconds ((value, current): int * MinutesExpressionHolderResult) : FinalExpressionHolderResult =
     current
     |> Result.bind (fun { Hours = hours; Minutes = minutes } ->
         value
@@ -81,11 +82,11 @@ let seconds ((value, current): int * MinutesExpressionResult) : FinalExpressionR
               Minutes = minutes
               Seconds = sec }))
 
-let generate (current: Result<FinalCronExpression, ExpressionError>) : ExpressionResult =
+let toCronExpression (current: FinalExpressionHolderResult) : ExpressionResult =
     let buildExpressionString
         ({ Seconds = seconds
            Minutes = minutes
-           Hours = hours }: FinalCronExpression)
+           Hours = hours }: FinalExpressionHolder)
         : string =
         let hoursInterval =
             match hours with

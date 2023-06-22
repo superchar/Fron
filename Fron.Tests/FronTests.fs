@@ -17,8 +17,7 @@ let private getErrorMessage (expression: ExpressionResult) : string =
 
 [<Fact>]
 let ``triggerEveryHour returns the correct Cron expression`` () =
-    let result =
-        triggerEveryHour |> toCronExpression
+    let result = triggerEveryHour ()
 
     result
     |> should be (ofCase <@ ExpressionResult.Ok @>)
@@ -30,8 +29,7 @@ let ``triggerEveryHour returns the correct Cron expression`` () =
 
 [<Fact>]
 let ``triggerEveryMinute returns the correct Cron expression`` () =
-    let result =
-        triggerEveryMinute |> toCronExpression
+    let result = triggerEveryMinute ()
 
     result
     |> should be (ofCase <@ ExpressionResult.Ok @>)
@@ -43,8 +41,7 @@ let ``triggerEveryMinute returns the correct Cron expression`` () =
 
 [<Fact>]
 let ``triggerEverySecond returns the correct Cron expression`` () =
-    let result =
-        triggerEverySecond |> toCronExpression
+    let result = triggerEverySecond ()
 
     result
     |> should be (ofCase <@ ExpressionResult.Ok @>)
@@ -61,16 +58,15 @@ let ``triggerEverySecond returns the correct Cron expression`` () =
 [<InlineData(23)>]
 let ``when hours are specified the result expression contains hours value`` hoursValue =
     let result =
-        triggerAt hoursValue
-        |> hours
+        trigger (At hoursValue)
+        |> hour
         |> andAlsoZero
-        |> minutes
+        |> minute
         |> andAlsoZero
-        |> seconds
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -88,16 +84,15 @@ let ``when hours are specified the result expression contains hours value`` hour
 [<InlineData(99)>]
 let ``when hours are specified with invalid values error is returned`` hoursValue =
     let result =
-        triggerAt hoursValue
-        |> hours
+        trigger (At hoursValue)
+        |> hour
         |> andAlsoZero
-        |> minutes
+        |> minute
         |> andAlsoZero
-        |> seconds
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -111,18 +106,17 @@ let ``when hours are specified with invalid values error is returned`` hoursValu
 [<InlineData(0)>]
 [<InlineData(30)>]
 [<InlineData(59)>]
-let ``when minutes are specified the result expression contains minutes value`` minutesValue =
+let ``when minute are specified the result expression contains minute value`` minuteValue =
     let result =
         triggerAtZero
-        |> hours
-        |> andAlso minutesValue
-        |> minutes
+        |> hour
+        |> andAlso (At minuteValue)
+        |> minute
         |> andAlsoZero
-        |> seconds
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -132,24 +126,23 @@ let ``when minutes are specified the result expression contains minutes value`` 
         result |> getLeft
 
     value
-    |> should be (equal $"0 {minutesValue} 0 1 1 ? *")
+    |> should be (equal $"0 {minuteValue} 0 1 1 ? *")
 
 [<Theory>]
 [<InlineData(-5)>]
 [<InlineData(61)>]
 [<InlineData(99)>]
-let ``when minutes are specified with invalid values error is returned`` minutesValue =
+let ``when minute are specified with invalid values error is returned`` minuteValue =
     let result =
         triggerAtZero
-        |> hours
-        |> andAlso minutesValue
-        |> minutes
+        |> hour
+        |> andAlso (At minuteValue)
+        |> minute
         |> andAlsoZero
-        |> seconds
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -157,24 +150,23 @@ let ``when minutes are specified with invalid values error is returned`` minutes
 
     result
     |> getErrorMessage
-    |> should be (equal $"{minutesValue} is beyond permitted range.")
+    |> should be (equal $"{minuteValue} is beyond permitted range.")
 
 [<Theory>]
 [<InlineData(0)>]
 [<InlineData(30)>]
 [<InlineData(59)>]
-let ``when seconds are specified the result expression contains seconds value`` secondValue =
+let ``when second are specified the result expression contains second value`` secondValue =
     let result =
         triggerAtZero
-        |> hours
+        |> hour
         |> andAlsoZero
-        |> minutes
-        |> andAlso secondValue
-        |> seconds
+        |> minute
+        |> andAlso (At secondValue)
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -190,18 +182,17 @@ let ``when seconds are specified the result expression contains seconds value`` 
 [<InlineData(-5)>]
 [<InlineData(61)>]
 [<InlineData(99)>]
-let ``when seconds are specified with invalid values error is returned`` secondsValue =
+let ``when second are specified with invalid values error is returned`` secondValue =
     let result =
         triggerAtZero
-        |> hours
-        |> andAlso secondsValue
-        |> minutes
-        |> andAlso secondsValue
-        |> seconds
+        |> hour
+        |> andAlsoZero
+        |> minute
+        |> andAlso (At secondValue)
+        |> second
         |> andAlsoFirst
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -209,24 +200,23 @@ let ``when seconds are specified with invalid values error is returned`` seconds
 
     result
     |> getErrorMessage
-    |> should be (equal $"{secondsValue} is beyond permitted range.")
+    |> should be (equal $"{secondValue} is beyond permitted range.")
 
 [<Theory>]
 [<InlineData(1)>]
 [<InlineData(31)>]
 [<InlineData(15)>]
-let ``when day is specified the result expression contains seconds value`` daysValue =
+let ``when day is specified the result expression contains second value`` daysValue =
     let result =
         triggerAtZero
-        |> hours
+        |> hour
         |> andAlsoZero
-        |> minutes
+        |> minute
         |> andAlsoZero
-        |> seconds
-        |> andAlso daysValue
+        |> second
+        |> andAlso (On daysValue)
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -245,15 +235,14 @@ let ``when day is specified the result expression contains seconds value`` daysV
 let ``when day is specified with invalid values error is returned`` daysValue =
     let result =
         triggerAtZero
-        |> hours
+        |> hour
         |> andAlsoZero
-        |> minutes
+        |> minute
         |> andAlsoZero
-        |> seconds
-        |> andAlso daysValue
+        |> second
+        |> andAlso (On daysValue)
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result
@@ -266,16 +255,10 @@ let ``when day is specified with invalid values error is returned`` daysValue =
 [<Fact>]
 let ``when all the values are specified the result expression contains all the values`` () =
     let result =
-        triggerAt 13
-        |> hours
-        |> andAlso 5
-        |> minutes
-        |> andAlso 11
-        |> seconds
-        |> andAlso 6
-        |> day
-        |> andAlsoOn February
-        |> month
+        trigger (At 13) |> hour
+        |> andAlso (At 5) |> minute
+        |> andAlso (At 11) |> second
+        |> andAlso (On 6) |> day |> ofMonth February 
         |> toCronExpression
 
     result
@@ -289,21 +272,20 @@ let ``when all the values are specified the result expression contains all the v
 [<Fact>]
 let ``when values are all invalid returns first error`` () =
     let hoursValue = 25
-    let minutesValue = 61
-    let secondsValue = 61
+    let minuteValue = 61
+    let secondValue = 61
     let daysValue = 32
 
     let result =
-        triggerAt hoursValue
-        |> hours
-        |> andAlso minutesValue
-        |> minutes
-        |> andAlso secondsValue
-        |> seconds
-        |> andAlso daysValue
+        trigger (At hoursValue)
+        |> hour
+        |> andAlso (At minuteValue)
+        |> minute
+        |> andAlso (At secondValue)
+        |> second
+        |> andAlso (On daysValue)
         |> day
-        |> andAlsoOn January
-        |> month
+        |> ofMonth January
         |> toCronExpression
 
     result

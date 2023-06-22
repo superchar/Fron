@@ -10,6 +10,3 @@ let tryCreateLimited (fromValue: int) (toValue: int) (ctor: int -> 'a) (value: i
 
 let tryCreateLimitedPositive (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
     tryCreateLimited 0 toValue ctor value
-
-let tryCreateLessThanSixty ctor (value: int) =
-    value |> tryCreateLimitedPositive 60 ctor

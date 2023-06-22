@@ -5,14 +5,12 @@ open CommonTypes
 open Microsoft.FSharp.Core
 
 type ExecutionTime =
-    private
-    | ParticularTime of int
-    | Everytime
+    | At of int
+    | Every
 
 type ExecutionDayOfMonth =
-    private
-    | ParticularDayOfMoth of int
-    | EverydayOfMonth
+    | On of int
+    | Everyday
 
 type ExecutionMonth =
     | January
@@ -29,10 +27,7 @@ type ExecutionMonth =
     | December
     | EveryMonth
 
-
 type CronExpression = CronExpression of string
-
-type NewExpressionHolder = { Value: int }
 type HoursExpressionHolder = { Hours: ExecutionTime }
 
 type MinutesExpressionHolder =
@@ -64,99 +59,64 @@ type DayOfMonthExpressionHolderResult = ExpressionErrorResult<DayOfMonthExpressi
 type MonthExpressionHolderResult = ExpressionErrorResult<MonthExpressionHolder>
 type ExpressionResult = ExpressionErrorResult<CronExpression>
 
-let EverySecondExpressionHolder =
-    { Seconds = Everytime
-      Minutes = Everytime
-      Hours = Everytime
-      DayOfMonth = EverydayOfMonth
-      Month = EveryMonth }
+let trigger (value: ExecutionTime) : ExecutionTime = value
 
-let ZeroNewExpressionHolder: NewExpressionHolder =
-    { Value = 0 }
+let triggerAtZero : ExecutionTime = trigger (At 0)
 
-let triggerAt (value: int) : NewExpressionHolder = { Value = value }
+let andAlso (value: 'b) (current: ExpressionErrorResult<'a>) : 'b * ExpressionErrorResult<'a> = value, current
 
-let triggerAtZero: NewExpressionHolder =
-    ZeroNewExpressionHolder
+let andAlsoZero (current: ExpressionErrorResult<'a>) : ExecutionTime * ExpressionErrorResult<'a> =
+    andAlso (At 0) current
 
-let andAlso (value: int) (current: ExpressionErrorResult<'a>) : int * ExpressionErrorResult<'a> = value, current
+let andAlsoFirst (current: ExpressionErrorResult<'a>) : ExecutionDayOfMonth * ExpressionErrorResult<'a> =
+    andAlso (On 1) current
 
-let andAlsoZero (current: ExpressionErrorResult<'a>) : int * ExpressionErrorResult<'a> = andAlso 0 current
+let private getPositiveTime (toValue: int) (executionTime: ExecutionTime) =
+    match executionTime with
+    | At value -> value |> tryCreateLimitedPositive toValue At
+    | Every -> Ok executionTime
 
-let andAlsoFirst (current: ExpressionErrorResult<'a>) : int * ExpressionErrorResult<'a> = andAlso 1 current
+let hour (executionTime: ExecutionTime) : HoursExpressionHolderResult =
+    executionTime
+    |> getPositiveTime 24
+    |> Result.map (fun hours -> { Hours = hours })
 
-let andAlsoOn
-    (month: ExecutionMonth)
-    (current: ExpressionErrorResult<'a>)
-    : ExecutionMonth * ExpressionErrorResult<'a> =
-    month, current
-
-let triggerEveryHour: MonthExpressionHolderResult =
-
-    Ok
-        { EverySecondExpressionHolder with
-            Seconds = ParticularTime 0
-            Minutes = ParticularTime 0 }
-
-let hours ({ Value = value }: NewExpressionHolder) : HoursExpressionHolderResult =
-    value
-    |> tryCreateLimitedPositive 24 ParticularTime
-    |> Result.map (fun hrs -> { Hours = hrs })
-
-let triggerEveryMinute: MonthExpressionHolderResult =
-    Ok { EverySecondExpressionHolder with Seconds = ParticularTime 0 }
-
-let minutes ((value, current): int * HoursExpressionHolderResult) : MinutesExpressionHolderResult =
+let minute ((value, current): ExecutionTime * HoursExpressionHolderResult) : MinutesExpressionHolderResult =
     current
     |> Result.bind (fun { Hours = hours } ->
         value
-        |> tryCreateLessThanSixty ParticularTime
+        |> getPositiveTime 60
         |> Result.map (fun minutes -> { Hours = hours; Minutes = minutes }))
 
-let triggerEverySecond: MonthExpressionHolderResult =
-    Ok EverySecondExpressionHolder
-
-let seconds ((value, current): int * MinutesExpressionHolderResult) : SecondsExpressionHolderResult =
+let second ((value, current): ExecutionTime * MinutesExpressionHolderResult) : SecondsExpressionHolderResult =
     current
     |> Result.bind (fun { Hours = hours; Minutes = minutes } ->
         value
-        |> tryCreateLessThanSixty ParticularTime
+        |> getPositiveTime 60
         |> Result.map (fun sec ->
             { Hours = hours
               Minutes = minutes
               Seconds = sec }))
 
+let day ((dayValue, current): ExecutionDayOfMonth * SecondsExpressionHolderResult) : DayOfMonthExpressionHolderResult =
+    let day =
+        match dayValue with
+        | On value -> value |> tryCreateLimited 1 32 On
+        | Everyday -> Ok dayValue
 
-let triggerEveryDay: MonthExpressionHolderResult =
-    Ok
-        { EverySecondExpressionHolder with
-            Seconds = ParticularTime 0
-            Minutes = ParticularTime 0
-            Hours = ParticularTime 0 }
-
-let day ((dayValue, current): int * SecondsExpressionHolderResult) : DayOfMonthExpressionHolderResult =
     current
     |> Result.bind
         (fun { Hours = hours
                Minutes = minutes
                Seconds = seconds } ->
-            dayValue
-            |> tryCreateLimited 1 32 ParticularDayOfMoth
+            day
             |> Result.map (fun dayOfMoth ->
                 { Hours = hours
                   Minutes = minutes
                   Seconds = seconds
                   DayOfMonth = dayOfMoth }))
 
-let triggerEveryMonth: MonthExpressionHolderResult =
-    Ok
-        { EverySecondExpressionHolder with
-            Seconds = ParticularTime 0
-            Minutes = ParticularTime 0
-            Hours = ParticularTime 0
-            DayOfMonth = ParticularDayOfMoth 1 }
-
-let month ((monthValue, current): ExecutionMonth * DayOfMonthExpressionHolderResult) : MonthExpressionHolderResult =
+let ofMonth (monthValue: ExecutionMonth) (current: DayOfMonthExpressionHolderResult) : MonthExpressionHolderResult =
     current
     |> Result.map
         (fun { Hours = hours
@@ -172,13 +132,13 @@ let month ((monthValue, current): ExecutionMonth * DayOfMonthExpressionHolderRes
 let toCronExpression (current: MonthExpressionHolderResult) : ExpressionResult =
     let getTime (executionTime: ExecutionTime) =
         match executionTime with
-        | ParticularTime time -> $"{time}"
-        | Everytime -> "*"
+        | At time -> $"{time}"
+        | Every -> "*"
 
     let getDayOfMonth (executionTime: ExecutionDayOfMonth) =
         match executionTime with
-        | ParticularDayOfMoth day -> $"{day}"
-        | EverydayOfMonth -> "*"
+        | On day -> $"{day}"
+        | Everyday -> "*"
 
     let getMonth (executionMonth: ExecutionMonth) =
         match executionMonth with
@@ -207,3 +167,66 @@ let toCronExpression (current: MonthExpressionHolderResult) : ExpressionResult =
 
     current
     |> Result.map (buildExpressionString >> CronExpression)
+
+let everyTime () = Every
+let zeroTime () = At 0
+
+let triggerEveryHour =
+    everyTime
+    >> hour
+    >> andAlso (At 0)
+    >> minute
+    >> andAlso (At 0)
+    >> second
+    >> andAlso Everyday
+    >> day
+    >> ofMonth EveryMonth
+    >> toCronExpression
+
+let triggerEveryMinute =
+    everyTime
+    >> hour
+    >> andAlso (Every)
+    >> minute
+    >> andAlso (At 0)
+    >> second
+    >> andAlso Everyday
+    >> day
+    >> ofMonth EveryMonth
+    >> toCronExpression
+
+let triggerEverySecond =
+    everyTime
+    >> hour
+    >> andAlso (Every)
+    >> minute
+    >> andAlso (Every)
+    >> second
+    >> andAlso Everyday
+    >> day
+    >> ofMonth EveryMonth
+    >> toCronExpression
+
+let triggerEveryDay =
+    zeroTime
+    >> hour
+    >> andAlso (At 0)
+    >> minute
+    >> andAlso (At 0)
+    >> second
+    >> andAlso Everyday
+    >> day
+    >> ofMonth EveryMonth
+    >> toCronExpression
+
+let triggerEveryMonth =
+    zeroTime
+    >> hour
+    >> andAlso (At 0)
+    >> minute
+    >> andAlso (At 0)
+    >> second
+    >> andAlso (On 1)
+    >> day
+    >> ofMonth EveryMonth
+    >> toCronExpression

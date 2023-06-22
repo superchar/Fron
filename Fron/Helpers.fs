@@ -2,10 +2,14 @@
 
 open CommonTypes
 
-let tryCreateLimited (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
-    if value >= 0 && value < toValue then
+let tryCreateLimited (fromValue: int) (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
+    if value >= fromValue && value < toValue then
         value |> ctor |> Ok
     else
         Error(ExpressionError $"{value} is beyond permitted range.")
 
-let tryCreateLessThanSixty ctor (value: int) = value |> tryCreateLimited 60 ctor
+let tryCreateLimitedPositive (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
+    tryCreateLimited 0 toValue ctor value
+
+let tryCreateLessThanSixty ctor (value: int) =
+    value |> tryCreateLimitedPositive 60 ctor

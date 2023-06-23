@@ -255,10 +255,15 @@ let ``when day is specified with invalid values error is returned`` daysValue =
 [<Fact>]
 let ``when all the values are specified the result expression contains all the values`` () =
     let result =
-        trigger (At 13) |> hour
-        |> andAlso (At 5) |> minute
-        |> andAlso (At 11) |> second
-        |> andAlso (On 6) |> day |> ofMonth February 
+        trigger (At 13)
+        |> hour
+        |> andAlso (At 5)
+        |> minute
+        |> andAlso (At 11)
+        |> second
+        |> andAlso (On 6)
+        |> day
+        |> ofMonth February
         |> toCronExpression
 
     result
@@ -294,3 +299,79 @@ let ``when values are all invalid returns first error`` () =
     result
     |> getErrorMessage
     |> should be (equal $"{hoursValue} is beyond permitted range.")
+
+[<Fact>]
+let ``finishOnHoursRestAreEvery should set the rest to every`` () =
+    let result =
+        trigger (At 13)
+        |> hour
+        |> finishOnHoursRestAreEvery
+        |> toCronExpression
+
+    result
+    |> should be (ofCase <@ ExpressionResult.Ok @>)
+
+    let (CronExpression value) =
+        result |> getLeft
+
+    value |> should be (equal "* * 13 * * ? *")
+
+[<Fact>]
+let ``finishOnMinutesRestAreEvery should set the rest to every`` () =
+    let result =
+        trigger (At 13)
+        |> hour
+        |> andAlso (At 45)
+        |> minute
+        |> finishOnMinutesRestAreEvery
+        |> toCronExpression
+
+    result
+    |> should be (ofCase <@ ExpressionResult.Ok @>)
+
+    let (CronExpression value) =
+        result |> getLeft
+
+    value |> should be (equal "* 45 13 * * ? *")
+
+[<Fact>]
+let ``finishOnSecondsRestAreEvery should set the rest to every`` () =
+    let result =
+        trigger (At 13)
+        |> hour
+        |> andAlso (At 45)
+        |> minute
+        |> andAlso (At 30)
+        |> second
+        |> finishOnSecondsRestAreEvery
+        |> toCronExpression
+
+    result
+    |> should be (ofCase <@ ExpressionResult.Ok @>)
+
+    let (CronExpression value) =
+        result |> getLeft
+
+    value |> should be (equal "30 45 13 * * ? *")
+
+[<Fact>]
+let ``finishOnDaysRestAreEvery should set the rest to every`` () =
+    let result =
+        trigger (At 13)
+        |> hour
+        |> andAlso (At 45)
+        |> minute
+        |> andAlso (At 30)
+        |> second
+        |> andAlso (On 5)
+        |> day
+        |> finishOnDaysRestAreEvery
+        |> toCronExpression
+
+    result
+    |> should be (ofCase <@ ExpressionResult.Ok @>)
+
+    let (CronExpression value) =
+        result |> getLeft
+
+    value |> should be (equal "30 45 13 5 * ? *")

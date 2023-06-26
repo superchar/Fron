@@ -1,6 +1,6 @@
-﻿module Helpers
+﻿module Fron.Helpers
 
-open CommonTypes
+open Types
 
 let tryCreateLimited (fromValue: int) (toValue: int) (ctor: int -> 'a) (value: int) : ExpressionErrorResult<'a> =
     if value >= fromValue && value < toValue then

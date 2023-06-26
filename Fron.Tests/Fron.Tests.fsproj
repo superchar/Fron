@@ -23,7 +23,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Include="FronTests.fs" />
+      <Compile Include="ApiTests.fs" />
     </ItemGroup>
 
     <ItemGroup>

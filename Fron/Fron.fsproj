@@ -6,9 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <Compile Include="CommonTypes.fs" />
+      <Compile Include="Types.fs" />
+      <Compile Include="ExpressionBuilder.fs" />
       <Compile Include="Helpers.fs" />
-      <Compile Include="Fron.fs" />
+      <Compile Include="Api.fs" />
     </ItemGroup>
 
 </Project>

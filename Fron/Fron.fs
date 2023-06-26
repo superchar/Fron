@@ -10,7 +10,19 @@ type ExecutionTime =
 
 type ExecutionDayOfMonth =
     | On of int
-    | Everyday
+    | EveryDayOfMonth
+    | SkipDayOfMonth
+
+type ExecutionDayOfWeek =
+    | Monday
+    | Tuesday
+    | Wednesday
+    | Thursday
+    | Friday
+    | Saturday
+    | Sunday
+    | SkipDayOfWeek
+    | EveryDayOfWeek
 
 type ExecutionMonth =
     | January
@@ -39,16 +51,18 @@ type SecondsExpressionHolder =
       Minutes: ExecutionTime
       Seconds: ExecutionTime }
 
-type DayOfMonthExpressionHolder =
+type DayExpressionHolder =
     { Hours: ExecutionTime
       Minutes: ExecutionTime
       Seconds: ExecutionTime
+      DayOfWeek: ExecutionDayOfWeek
       DayOfMonth: ExecutionDayOfMonth }
 
 type MonthExpressionHolder =
     { Hours: ExecutionTime
       Minutes: ExecutionTime
       Seconds: ExecutionTime
+      DayOfWeek: ExecutionDayOfWeek
       DayOfMonth: ExecutionDayOfMonth
       Month: ExecutionMonth }
 
@@ -56,13 +70,14 @@ type ExpressionHolder =
     | Hours of HoursExpressionHolder
     | Minutes of MinutesExpressionHolder
     | Seconds of SecondsExpressionHolder
-    | DayOfMoth of DayOfMonthExpressionHolder
+    | DayOfMoth of DayExpressionHolder
+    | DayOfWeek of DayExpressionHolder
     | Month of MonthExpressionHolder
 
 type HoursExpressionHolderResult = ExpressionErrorResult<HoursExpressionHolder>
 type MinutesExpressionHolderResult = ExpressionErrorResult<MinutesExpressionHolder>
 type SecondsExpressionHolderResult = ExpressionErrorResult<SecondsExpressionHolder>
-type DayOfMonthExpressionHolderResult = ExpressionErrorResult<DayOfMonthExpressionHolder>
+type DayExpressionHolderResult = ExpressionErrorResult<DayExpressionHolder>
 type MonthExpressionHolderResult = ExpressionErrorResult<MonthExpressionHolder>
 type ExpressionResult = ExpressionErrorResult<CronExpression>
 type ExpressionHolderResult = ExpressionErrorResult<ExpressionHolder>
@@ -113,11 +128,15 @@ let second ((value, current): ExecutionTime * MinutesExpressionHolderResult) : S
 
 let finishOnSecondsRestAreEvery (current: SecondsExpressionHolderResult) = current |> Result.map Seconds
 
-let day ((dayValue, current): ExecutionDayOfMonth * SecondsExpressionHolderResult) : DayOfMonthExpressionHolderResult =
+let private cannotSkipDayAndDayOfWeekError =
+    ExpressionError "Cannot skip both day and day of week"
+
+let day ((dayValue, current): ExecutionDayOfMonth * SecondsExpressionHolderResult) : DayExpressionHolderResult =
     let day =
         match dayValue with
         | On value -> value |> tryCreateLimited 1 32 On
-        | Everyday -> Ok dayValue
+        | EveryDayOfMonth -> Ok dayValue
+        | SkipDayOfMonth -> Error cannotSkipDayAndDayOfWeekError
 
     current
     |> Result.bind
@@ -129,21 +148,46 @@ let day ((dayValue, current): ExecutionDayOfMonth * SecondsExpressionHolderResul
                 { Hours = hours
                   Minutes = minutes
                   Seconds = seconds
+                  DayOfWeek = SkipDayOfWeek
                   DayOfMonth = dayOfMoth }))
 
-let finishOnDaysRestAreEvery (current: DayOfMonthExpressionHolderResult) = current |> Result.map DayOfMoth
+let finishOnDaysRestAreEvery (current: DayExpressionHolderResult) = current |> Result.map DayOfMoth
 
-let ofMonth (monthValue: ExecutionMonth) (current: DayOfMonthExpressionHolderResult) : ExpressionHolderResult =
+let dayOfWeek ((dayValue, current): ExecutionDayOfWeek * SecondsExpressionHolderResult) : DayExpressionHolderResult =
+
+    current
+    |> Result.bind
+        (fun { Hours = hours
+               Minutes = minutes
+               Seconds = seconds } ->
+            let dayValueResult =
+                match dayValue with
+                | SkipDayOfWeek -> Error cannotSkipDayAndDayOfWeekError
+                | _ -> Ok dayValue
+
+            dayValueResult
+            |> Result.map (fun currentDayValue ->
+                { Hours = hours
+                  Minutes = minutes
+                  Seconds = seconds
+                  DayOfWeek = currentDayValue
+                  DayOfMonth = SkipDayOfMonth }))
+
+let finishOnDaysOfWeekRestAreEvery (current: DayExpressionHolderResult) = current |> Result.map DayOfWeek
+
+let ofMonth (monthValue: ExecutionMonth) (current: DayExpressionHolderResult) : ExpressionHolderResult =
     current
     |> Result.map
         (fun { Hours = hours
                Minutes = minutes
                Seconds = seconds
+               DayOfWeek = dayOfWeek
                DayOfMonth = dayOfMoth } ->
             Month
                 { Hours = hours
                   Minutes = minutes
                   Seconds = seconds
+                  DayOfWeek = dayOfWeek
                   DayOfMonth = dayOfMoth
                   Month = monthValue })
 
@@ -151,7 +195,8 @@ let EverySecondExpressionHolder =
     { Hours = Every
       Minutes = Every
       Seconds = Every
-      DayOfMonth = Everyday
+      DayOfMonth = EveryDayOfMonth
+      DayOfWeek = SkipDayOfWeek
       Month = EveryMonth }
 
 let toCronExpression (current: ExpressionHolderResult) : ExpressionResult =
@@ -177,7 +222,18 @@ let toCronExpression (current: ExpressionHolderResult) : ExpressionResult =
                 Hours = hours
                 Minutes = minutes
                 Seconds = seconds
-                DayOfMonth = dayOfMonth }
+                DayOfMonth = dayOfMonth
+                DayOfWeek = SkipDayOfWeek }
+        | DayOfWeek { Hours = hours
+                      Minutes = minutes
+                      Seconds = seconds
+                      DayOfWeek = dayOfWeek } ->
+            { EverySecondExpressionHolder with
+                Hours = hours
+                Minutes = minutes
+                Seconds = seconds
+                DayOfMonth = SkipDayOfMonth
+                DayOfWeek = dayOfWeek }
         | Month value -> value
 
     let getTime (executionTime: ExecutionTime) =
@@ -188,7 +244,20 @@ let toCronExpression (current: ExpressionHolderResult) : ExpressionResult =
     let getDayOfMonth (executionTime: ExecutionDayOfMonth) =
         match executionTime with
         | On day -> $"{day}"
-        | Everyday -> "*"
+        | EveryDayOfMonth -> "*"
+        | SkipDayOfMonth -> "?"
+
+    let getDayOfWeek (executionTime: ExecutionDayOfWeek) =
+        match executionTime with
+        | Monday -> "MON"
+        | Tuesday -> "TUE"
+        | Wednesday -> "WED"
+        | Thursday -> "THU"
+        | Friday -> "FRI"
+        | Saturday -> "SAT"
+        | Sunday -> "SUN"
+        | EveryDayOfWeek -> "SUN-SAT"
+        | SkipDayOfWeek -> "?"
 
     let getMonth (executionMonth: ExecutionMonth) =
         match executionMonth with
@@ -210,10 +279,11 @@ let toCronExpression (current: ExpressionHolderResult) : ExpressionResult =
         ({ Seconds = seconds
            Minutes = minutes
            Hours = hours
+           DayOfWeek = dayOfWeek
            DayOfMonth = dayOfMonth
            Month = month }: MonthExpressionHolder)
         : string =
-        $"{getTime seconds} {getTime minutes} {getTime hours} {getDayOfMonth dayOfMonth} {getMonth month} ? *"
+        $"{getTime seconds} {getTime minutes} {getTime hours} {getDayOfMonth dayOfMonth} {getMonth month} {getDayOfWeek dayOfWeek} *"
 
     current
     |> Result.map (
@@ -232,7 +302,7 @@ let triggerEveryHour =
     >> minute
     >> andAlso (At 0)
     >> second
-    >> andAlso Everyday
+    >> andAlso EveryDayOfMonth
     >> day
     >> ofMonth EveryMonth
     >> toCronExpression
@@ -240,11 +310,11 @@ let triggerEveryHour =
 let triggerEveryMinute =
     everyTime
     >> hour
-    >> andAlso (Every)
+    >> andAlso Every
     >> minute
     >> andAlso (At 0)
     >> second
-    >> andAlso Everyday
+    >> andAlso EveryDayOfMonth
     >> day
     >> ofMonth EveryMonth
     >> toCronExpression
@@ -252,11 +322,11 @@ let triggerEveryMinute =
 let triggerEverySecond =
     everyTime
     >> hour
-    >> andAlso (Every)
+    >> andAlso Every
     >> minute
-    >> andAlso (Every)
+    >> andAlso Every
     >> second
-    >> andAlso Everyday
+    >> andAlso EveryDayOfMonth
     >> day
     >> ofMonth EveryMonth
     >> toCronExpression
@@ -268,7 +338,7 @@ let triggerEveryDay =
     >> minute
     >> andAlso (At 0)
     >> second
-    >> andAlso Everyday
+    >> andAlso EveryDayOfMonth
     >> day
     >> ofMonth EveryMonth
     >> toCronExpression
